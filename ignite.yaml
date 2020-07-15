@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ignite
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: ignite
+  namespace: default
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: ignite
+roleRef:
+  kind: ClusterRole
+  name: ignite
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: ignite
+  namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ignite
+  labels:
+    app: ignite
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ignite
+  template:
+    metadata:
+      labels:
+        app: ignite
+    spec:
+      serviceAccountName: ignite
+      containers:
+        # Custom Ignite pod name.
+      - name: ignite-node
+        image: apacheignite/ignite
+        env:
+        - name: NAMESPACE
+          value: "default"
+        - name: OPTION_LIBS
+          value: ignite-kubernetes,ignite-rest-http
+        - name: CONFIG_URI
+          value: https://storage.googleapis.com/grid-configs/openshift/default-config.xml
+          #value: https://raw.githubusercontent.com/apache/ignite/master/modules/kubernetes/config/example-kube-rbac.xml
+        - name: IGNITE_QUIET
+          value: "false"
+        - name: JVM_OPTS
+          value: "-Xms512m -Xmx512m -Djava.net.preferIPv4Stack=true"
+        ports:
+        - containerPort: 8080 # rest api
+        - containerPort: 11211 # REST port number.
+        - containerPort: 47100 # communication SPI port number.
+        - containerPort: 47500 # discovery SPI port number.
+        - containerPort: 49112 # JMX port number.
+        - containerPort: 10800 # SQL port number.
+        #- containerPort: 10900 # Thin clients port number.
+---
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: ignite-config
+#data:
+#  ignite.conf: |
+#<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util" xsi:schemaLocation=" http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd">
+#  <bean id="ignite.cfg" class="org.apache.ignite.configuration.IgniteConfiguration">
+#    <property name="discoverySpi">
+#      <bean class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi">
+#        <property name="ipFinder">
+#          <bean class="org.apache.ignite.spi.discovery.tcp.ipfinder.kubernetes.TcpDiscoveryKubernetesIpFinder">
+#            <property name="namespace" value="#{ systemEnvironment['NAMESPACE'] }"/>
+#          </bean>
+#        </property>
+#      </bean>
+#    </property>
+#  </bean>
+#</beans>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ignite
+  labels:
+    app: ignite
+spec:
+  selector:
+    app: ignite
+  ports:
+    - name: rest
+      port: 80
+      targetPort: 8080

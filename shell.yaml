@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shell
+spec:
+  containers:
+    - name: shalle
+      image: python:3
+      args:
+        - sleep
+        - "10000000"
